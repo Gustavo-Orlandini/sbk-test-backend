@@ -35,7 +35,9 @@ export class LawsuitRepository implements OnModuleInit {
     }
 
     /**
-     * Searches lawsuits with text query and optional filters
+     * Searches lawsuits with text query and optional filters.
+     * Note: Degree filter is not applied here - it's applied in the service after mapping
+     * to ensure it filters by grauAtual (current degree from selected proceeding).
      */
     search(query?: string, tribunal?: string, degree?: string): LawsuitRaw[] {
         let filtered = this.lawsuits;
@@ -48,15 +50,14 @@ export class LawsuitRepository implements OnModuleInit {
             filtered = this.filterByTribunal(filtered, tribunal);
         }
 
-        if (degree) {
-            filtered = this.filterByDegree(filtered, degree);
-        }
+        // Degree filter removed - applied in service after mapping to DTOs
+        // This ensures we filter by grauAtual (from selected proceeding) not raw tramitacoes
 
         return filtered;
     }
 
     /**
-     * Applies text search across case number, party names, classes, and subjects
+     * Applies text search across case number, tribunal acronym, party names, classes, and subjects
      */
     private applyTextSearch(lawsuits: LawsuitRaw[], query: string): LawsuitRaw[] {
         const queryLower = query.trim().toLowerCase();
@@ -69,6 +70,15 @@ export class LawsuitRepository implements OnModuleInit {
             if (lawsuit.numeroProcesso.toLowerCase().includes(queryLower)) {
                 return true;
             }
+
+            // Search in tribunal acronym
+            if (lawsuit.siglaTribunal.toLowerCase().includes(queryLower)) {
+                return true;
+            }
+
+            // Note: Degree search removed from text search to avoid confusion.
+            // Users should use the 'grau' parameter for degree filtering,
+            // or search by degree in query text (which will be filtered by grauAtual in service)
 
             // Search in party names (parties are in proceedings)
             const allParties = lawsuit.tramitacoes.flatMap((p) => p.partes || []);
@@ -94,22 +104,6 @@ export class LawsuitRepository implements OnModuleInit {
     private filterByTribunal(lawsuits: LawsuitRaw[], tribunal: string): LawsuitRaw[] {
         const tribunalUpper = tribunal.trim().toUpperCase();
         return lawsuits.filter((l) => l.siglaTribunal.toUpperCase() === tribunalUpper);
-    }
-
-    /**
-     * Filters lawsuits by degree
-     */
-    private filterByDegree(lawsuits: LawsuitRaw[], degree: string): LawsuitRaw[] {
-        const degreeUpper = degree.trim().toUpperCase();
-        return lawsuits.filter((lawsuit) => {
-            return lawsuit.tramitacoes.some((p) => {
-                const degreeSigla =
-                    typeof p.grau === 'object' && p.grau !== null
-                        ? p.grau.sigla
-                        : p.grau;
-                return degreeSigla?.toUpperCase().includes(degreeUpper) || false;
-            });
-        });
     }
 
     /**

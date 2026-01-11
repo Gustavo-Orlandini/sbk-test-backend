@@ -232,9 +232,9 @@ export class LawsuitMapper {
      */
     private static extractMovementCode(
         code?: number | string | null,
-    ): string | undefined {
+    ): string | null {
         if (code === null || code === undefined) {
-            return undefined;
+            return null;
         }
         return String(code);
     }

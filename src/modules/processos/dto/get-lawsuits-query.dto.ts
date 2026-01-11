@@ -4,7 +4,7 @@ import { CursorPaginationQueryDto } from 'src/shared/pagination/cursor-paginatio
 
 export class GetLawsuitsQueryDto extends CursorPaginationQueryDto {
     @ApiPropertyOptional({
-        description: 'Simple text search (case number, party names, class or subject)',
+        description: 'Simple text search (case number, tribunal acronym, party names, class or subject). If query matches a degree pattern (e.g., "G1", "G2"), filters by grauAtual.',
         example: 'João Silva',
     })
     @IsOptional()

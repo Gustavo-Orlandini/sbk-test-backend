@@ -109,9 +109,9 @@ export class LastMovementDetailDto {
     @ApiProperty({
         description: 'Movement code',
         example: '123',
-        required: false,
+        nullable: true,
     })
-    codigo?: string;
+    codigo: string | null;
 }
 
 export class LawsuitDetailDto {
