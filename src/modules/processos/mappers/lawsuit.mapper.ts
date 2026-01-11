@@ -3,48 +3,28 @@ import { LawsuitSummaryDto } from '../dto/lawsuit-summary.dto';
 import { LawsuitDetailDto } from '../dto/lawsuit-detail.dto';
 import { ProceedingSelector } from '../rules/proceeding-selector';
 
+/**
+ * Mapper responsible for transforming raw lawsuit data (from JSON) into DTOs
+ * for API responses. Handles normalization, data extraction, and edge cases.
+ */
 export class LawsuitMapper {
+    private static readonly MAX_REPRESENTATIVES_PER_PARTY = 5;
+
+    /**
+     * Maps a raw lawsuit to a summary DTO
+     */
     static toSummary(lawsuit: LawsuitRaw): LawsuitSummaryDto {
         const currentProceeding = ProceedingSelector.selectCurrentProceeding(
             lawsuit.tramitacoes,
         );
 
-        // Collect parties from all proceedings
-        const allParties = lawsuit.tramitacoes.flatMap((p) => p.partes || []);
+        const parties = this.collectParties(lawsuit.tramitacoes, currentProceeding);
+        const { activeParties, passiveParties } = this.separatePartiesByRole(parties);
 
-        // If there are no parties in proceedings, use parties from current proceeding
-        const parties = allParties.length > 0 ? allParties : currentProceeding.partes || [];
-
-        const activeParties = parties
-            .filter((p) => p.polo === 'ATIVO')
-            .map((p) => p.nome);
-
-        const passiveParties = parties
-            .filter((p) => p.polo === 'PASSIVO')
-            .map((p) => p.nome);
-
-        // Extract degree (can be object or string)
-        const currentDegree = typeof currentProceeding.grau === 'object'
-            ? currentProceeding.grau.sigla
-            : currentProceeding.grau;
-
-        // Extract main class
-        const mainClass = currentProceeding.classe && currentProceeding.classe.length > 0
-            ? currentProceeding.classe[0].descricao
-            : '';
-
-        // Extract main subject
-        const mainSubject = currentProceeding.assunto && currentProceeding.assunto.length > 0
-            ? currentProceeding.assunto[0].descricao
-            : '';
-
-        // Extract court from last movement
-        const movementCourt = currentProceeding.ultimoMovimento?.orgaoJulgador
-            ? currentProceeding.ultimoMovimento.orgaoJulgador[0]?.nome || ''
-            : '';
-
-        // Use proceeding court as fallback
-        const finalCourt = movementCourt || (currentProceeding.orgaoJulgador?.nome || '');
+        const currentDegree = this.extractDegree(currentProceeding.grau);
+        const mainClass = this.extractMainClass(currentProceeding);
+        const mainSubject = this.extractMainSubject(currentProceeding);
+        const lastMovementCourt = this.extractLastMovementCourt(currentProceeding);
 
         return {
             numeroProcesso: lawsuit.numeroProcesso,
@@ -56,7 +36,7 @@ export class LawsuitMapper {
                 ? {
                     dataHora: currentProceeding.ultimoMovimento.dataHora,
                     descricao: currentProceeding.ultimoMovimento.descricao,
-                    orgaoJulgador: finalCourt,
+                    orgaoJulgador: lastMovementCourt,
                 }
                 : null,
             partesResumo: {
@@ -66,57 +46,22 @@ export class LawsuitMapper {
         };
     }
 
+    /**
+     * Maps a raw lawsuit to a detail DTO
+     */
     static toDetail(lawsuit: LawsuitRaw): LawsuitDetailDto {
         const currentProceeding = ProceedingSelector.selectCurrentProceeding(
             lawsuit.tramitacoes,
         );
 
-        // Collect parties from all proceedings
-        const allParties = lawsuit.tramitacoes.flatMap((p) => p.partes || []);
+        const parties = this.collectParties(lawsuit.tramitacoes, currentProceeding);
+        const mappedParties = this.mapPartiesToDto(parties);
 
-        // If there are no parties in proceedings, use parties from current proceeding
-        const parties = allParties.length > 0 ? allParties : currentProceeding.partes || [];
-
-        const mappedParties = parties.map((party) => ({
-            nome: party.nome,
-            polo: party.polo.toLowerCase() as 'ativo' | 'passivo',
-            tipoParte: party.tipoParte || party.tipoPessoa || '',
-            representantes: (party.representantes || []).slice(0, 5).map((rep) => ({
-                nome: rep.nome,
-                tipo: rep.tipoRepresentacao || '',
-            })),
-        }));
-
-        // Extract degree (can be object or string)
-        const currentDegree = typeof currentProceeding.grau === 'object'
-            ? currentProceeding.grau.sigla
-            : currentProceeding.grau;
-
-        // Extract classes as string array
-        const classes = currentProceeding.classe
-            ? currentProceeding.classe.map((c) => c.descricao)
-            : [];
-
-        // Extract subjects as string array
-        const subjects = currentProceeding.assunto
-            ? currentProceeding.assunto.map((a) => a.descricao)
-            : [];
-
-        // Extract court
-        const proceedingCourt = currentProceeding.orgaoJulgador?.nome || '';
-
-        // Extract court from last movement
-        const movementCourt = currentProceeding.ultimoMovimento?.orgaoJulgador
-            ? currentProceeding.ultimoMovimento.orgaoJulgador[0]?.nome || ''
-            : '';
-
-        // Use movement court as priority, otherwise proceeding court
-        const finalCourt = movementCourt || proceedingCourt;
-
-        // Extract last movement code (can be number or string)
-        const movementCode = currentProceeding.ultimoMovimento?.codigo
-            ? String(currentProceeding.ultimoMovimento.codigo)
-            : undefined;
+        const currentDegree = this.extractDegree(currentProceeding.grau);
+        const classes = this.extractClasses(currentProceeding);
+        const subjects = this.extractSubjects(currentProceeding);
+        const proceedingCourt = this.extractCourt(currentProceeding.orgaoJulgador);
+        const movementCourt = this.extractLastMovementCourt(currentProceeding);
 
         return {
             numeroProcesso: lawsuit.numeroProcesso,
@@ -124,7 +69,7 @@ export class LawsuitMapper {
             nivelSigilo: lawsuit.nivelSigilo,
             tramitacaoAtual: {
                 grau: currentDegree,
-                orgaoJulgador: finalCourt,
+                orgaoJulgador: movementCourt || proceedingCourt,
                 classes,
                 assuntos: subjects,
                 dataDistribuicao: currentProceeding.dataHoraUltimaDistribuicao || null,
@@ -135,10 +80,162 @@ export class LawsuitMapper {
                 ? {
                     data: currentProceeding.ultimoMovimento.dataHora,
                     descricao: currentProceeding.ultimoMovimento.descricao,
-                    orgaoJulgador: movementCourt || finalCourt,
-                    codigo: movementCode,
+                    orgaoJulgador: movementCourt || proceedingCourt,
+                    codigo: this.extractMovementCode(currentProceeding.ultimoMovimento.codigo),
                 }
                 : null,
         };
+    }
+
+    /**
+     * Collects parties from all proceedings, with fallback to current proceeding
+     */
+    private static collectParties(
+        proceedings: ProceedingRaw[],
+        currentProceeding: ProceedingRaw,
+    ): PartyRaw[] {
+        const allParties = proceedings.flatMap((p) => p.partes || []);
+        return allParties.length > 0 ? allParties : currentProceeding.partes || [];
+    }
+
+    /**
+     * Separates parties by role (active/passive) and returns only names
+     */
+    private static separatePartiesByRole(parties: PartyRaw[]): {
+        activeParties: string[];
+        passiveParties: string[];
+    } {
+        const activeParties = parties
+            .filter((p) => p.polo === 'ATIVO')
+            .map((p) => p.nome)
+            .filter((nome) => nome && nome.trim().length > 0);
+
+        const passiveParties = parties
+            .filter((p) => p.polo === 'PASSIVO')
+            .map((p) => p.nome)
+            .filter((nome) => nome && nome.trim().length > 0);
+
+        return { activeParties, passiveParties };
+    }
+
+    /**
+     * Maps parties to DTO format with limited representatives
+     */
+    private static mapPartiesToDto(parties: PartyRaw[]) {
+        return parties.map((party) => ({
+            nome: party.nome,
+            polo: this.normalizePolo(party.polo),
+            tipoParte: party.tipoParte || party.tipoPessoa || null,
+            representantes: (party.representantes || [])
+                .slice(0, this.MAX_REPRESENTATIVES_PER_PARTY)
+                .map((rep) => ({
+                    nome: rep.nome,
+                    tipo: rep.tipoRepresentacao || null,
+                })),
+        }));
+    }
+
+    /**
+     * Normalizes polo from uppercase to lowercase enum
+     */
+    private static normalizePolo(polo: string): 'ativo' | 'passivo' {
+        const normalized = polo.toLowerCase();
+        return normalized === 'ativo' || normalized === 'passivo'
+            ? (normalized as 'ativo' | 'passivo')
+            : 'ativo'; // Default fallback
+    }
+
+    /**
+     * Extracts degree from grau (can be object or string)
+     */
+    private static extractDegree(
+        grau: string | { sigla?: string; numero?: number },
+    ): string {
+        if (typeof grau === 'object' && grau !== null) {
+            return grau.sigla || '';
+        }
+        return typeof grau === 'string' ? grau : '';
+    }
+
+    /**
+     * Extracts main class description, returns null if not available
+     */
+    private static extractMainClass(proceeding: ProceedingRaw): string | null {
+        if (!proceeding.classe || proceeding.classe.length === 0) {
+            return null;
+        }
+        const firstClass = proceeding.classe[0];
+        return firstClass?.descricao?.trim() || null;
+    }
+
+    /**
+     * Extracts main subject description, returns null if not available
+     */
+    private static extractMainSubject(proceeding: ProceedingRaw): string | null {
+        if (!proceeding.assunto || proceeding.assunto.length === 0) {
+            return null;
+        }
+        const firstSubject = proceeding.assunto[0];
+        return firstSubject?.descricao?.trim() || null;
+    }
+
+    /**
+     * Extracts all classes as string array
+     */
+    private static extractClasses(proceeding: ProceedingRaw): string[] {
+        if (!proceeding.classe || proceeding.classe.length === 0) {
+            return [];
+        }
+        return proceeding.classe
+            .map((c) => c.descricao?.trim())
+            .filter((desc): desc is string => Boolean(desc));
+    }
+
+    /**
+     * Extracts all subjects as string array
+     */
+    private static extractSubjects(proceeding: ProceedingRaw): string[] {
+        if (!proceeding.assunto || proceeding.assunto.length === 0) {
+            return [];
+        }
+        return proceeding.assunto
+            .map((a) => a.descricao?.trim())
+            .filter((desc): desc is string => Boolean(desc));
+    }
+
+    /**
+     * Extracts court name from court object
+     */
+    private static extractCourt(
+        court?: { id?: number; nome?: string } | null,
+    ): string | null {
+        if (!court?.nome) {
+            return null;
+        }
+        const trimmed = court.nome.trim();
+        return trimmed.length > 0 ? trimmed : null;
+    }
+
+    /**
+     * Extracts court from last movement
+     */
+    private static extractLastMovementCourt(proceeding: ProceedingRaw): string | null {
+        if (!proceeding.ultimoMovimento?.orgaoJulgador) {
+            return null;
+        }
+        const firstCourt = proceeding.ultimoMovimento.orgaoJulgador[0];
+        return this.extractCourt(firstCourt);
+    }
+
+    /**
+     * Extracts movement code and converts to string
+     */
+    private static extractMovementCode(
+        code?: number | string | null,
+    ): string | undefined {
+        if (code === null || code === undefined) {
+            return undefined;
+        }
+        return String(code);
     }
 }

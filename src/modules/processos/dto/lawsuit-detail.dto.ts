@@ -10,8 +10,9 @@ export class CurrentProceedingDto {
     @ApiProperty({
         description: 'Judging court',
         example: '1ª Vara Cível',
+        nullable: true,
     })
-    orgaoJulgador: string;
+    orgaoJulgador: string | null;
 
     @ApiProperty({
         description: 'Case classes',
@@ -52,8 +53,9 @@ export class RepresentativeDto {
     @ApiProperty({
         description: 'Representative type',
         example: 'advogado',
+        nullable: true,
     })
-    tipo: string;
+    tipo: string | null;
 }
 
 export class PartyDetailDto {
@@ -73,8 +75,9 @@ export class PartyDetailDto {
     @ApiProperty({
         description: 'Party type',
         example: 'pessoa_fisica',
+        nullable: true,
     })
-    tipoParte: string;
+    tipoParte: string | null;
 
     @ApiProperty({
         description: 'Representatives (limited to 5)',
@@ -99,8 +102,9 @@ export class LastMovementDetailDto {
     @ApiProperty({
         description: 'Judging court',
         example: '1ª Vara Cível',
+        nullable: true,
     })
-    orgaoJulgador: string;
+    orgaoJulgador: string | null;
 
     @ApiProperty({
         description: 'Movement code',

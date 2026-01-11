@@ -4,14 +4,14 @@ import { IsOptional, IsInt, Min, Max } from 'class-validator';
 
 export class CursorPaginationQueryDto {
     @ApiPropertyOptional({
-        description: 'Token de paginação baseado em cursor',
+        description: 'Cursor-based pagination token',
         example: 'eyJpZCI6IjAwMDAwMDEtMjMuMjAyMy44LjI2LjAxMDAifQ==',
     })
     @IsOptional()
     cursor?: string;
 
     @ApiPropertyOptional({
-        description: 'Número de itens por página',
+        description: 'Number of items per page',
         minimum: 1,
         maximum: 100,
         default: 20,

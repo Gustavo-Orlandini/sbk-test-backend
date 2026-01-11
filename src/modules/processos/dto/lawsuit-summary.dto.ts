@@ -16,8 +16,9 @@ export class LastMovementSummaryDto {
     @ApiProperty({
         description: 'Judging court',
         example: '1ª Vara Cível',
+        nullable: true,
     })
-    orgaoJulgador: string;
+    orgaoJulgador: string | null;
 }
 
 export class PartiesSummaryDto {
@@ -58,14 +59,16 @@ export class LawsuitSummaryDto {
     @ApiProperty({
         description: 'Main case class',
         example: 'Procedimento Comum Cível',
+        nullable: true,
     })
-    classePrincipal: string;
+    classePrincipal: string | null;
 
     @ApiProperty({
         description: 'Main case subject',
         example: 'Cobrança',
+        nullable: true,
     })
-    assuntoPrincipal: string;
+    assuntoPrincipal: string | null;
 
     @ApiProperty({
         description: 'Last movement of the case',
