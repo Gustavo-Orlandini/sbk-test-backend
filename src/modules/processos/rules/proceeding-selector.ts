@@ -5,9 +5,9 @@ import { ProceedingRaw } from '../interfaces/lawsuit-raw.interface';
  * following a deterministic rule.
  *
  * SELECTION RULE:
- * 1. Prioritize proceedings with active === true
- * 2. Among them, select the one with the most recent lastMovement.dataHora
- * 3. In case of a tie, prioritize the highest degree (G2 > G1)
+ * 1. Prioritize proceedings with ativo === true
+ * 2. Among them, choose the one with the highest dataHoraUltimaDistribuicao
+ * 3. In case of a tie, choose the one with the highest grau.numero
  * 4. As fallback, use the first available proceeding
  */
 export class ProceedingSelector {
@@ -26,9 +26,9 @@ export class ProceedingSelector {
 
         // Sort active proceedings
         const sorted = [...activeProceedings].sort((a, b) => {
-            // Compare last movement date (most recent first)
-            const dateA = this.getLastMovementDate(a);
-            const dateB = this.getLastMovementDate(b);
+            // Compare dataHoraUltimaDistribuicao (most recent first)
+            const dateA = a.dataHoraUltimaDistribuicao;
+            const dateB = b.dataHoraUltimaDistribuicao;
 
             if (dateA && dateB) {
                 const diff = new Date(dateB).getTime() - new Date(dateA).getTime();
@@ -41,17 +41,13 @@ export class ProceedingSelector {
                 return 1; // B has date, A doesn't - B comes first
             }
 
-            // In case of tie on date, compare degree (G2 > G1)
+            // In case of tie on date, compare grau.numero (highest first)
             const degreeA = this.extractDegree(a.grau);
             const degreeB = this.extractDegree(b.grau);
             return degreeB - degreeA;
         });
 
         return sorted[0];
-    }
-
-    private static getLastMovementDate(proceeding: ProceedingRaw): string | null {
-        return proceeding.ultimoMovimento?.dataHora || null;
     }
 
     private static extractDegree(grau: string | { sigla?: string; numero?: number }): number {

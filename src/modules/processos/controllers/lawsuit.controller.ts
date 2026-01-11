@@ -5,15 +5,17 @@ import {
     ApiResponse,
     ApiParam,
     ApiQuery,
+    ApiExtraModels,
     getSchemaPath,
 } from '@nestjs/swagger';
 import { LawsuitService } from '../services/lawsuit.service';
 import { GetLawsuitsQueryDto } from '../dto/get-lawsuits-query.dto';
-import { LawsuitSummaryDto } from '../dto/lawsuit-summary.dto';
+import { LawsuitSummaryDto, LastMovementSummaryDto, PartiesSummaryDto } from '../dto/lawsuit-summary.dto';
 import { LawsuitDetailDto } from '../dto/lawsuit-detail.dto';
 import { CursorPaginatedResponseDto } from 'src/shared/pagination/cursor-paginated-response.dto';
 
 @ApiTags('lawsuits')
+@ApiExtraModels(LawsuitSummaryDto, LastMovementSummaryDto, PartiesSummaryDto, CursorPaginatedResponseDto)
 @Controller('lawsuits')
 export class LawsuitController {
     constructor(private readonly lawsuitService: LawsuitService) { }
